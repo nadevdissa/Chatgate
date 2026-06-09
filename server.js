@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
-const { readDb, writeDb, getStorageMode, getPostgresUrl } = require('./lib/store');
+const { readDb, writeDb, getStorageMode, getPostgresUrl, pgEnv } = require('./lib/store');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -404,6 +404,12 @@ app.get('/api/health', (req, res) => {
     service: 'chatgate',
     storage: getStorageMode(),
     hasPostgresUrl: Boolean(getPostgresUrl()),
+    postgresVars: {
+      POSTGRES_URL: Boolean(pgEnv('POSTGRES_URL')),
+      POSTGRES_PASSWORD: Boolean(pgEnv('POSTGRES_PASSWORD')),
+      Chatgate_POSTGRES_URL: Boolean(process.env.Chatgate_POSTGRES_URL),
+      Chatgate_POSTGRES_PASSWORD: Boolean(process.env.Chatgate_POSTGRES_PASSWORD),
+    },
   });
 });
 
