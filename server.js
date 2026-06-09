@@ -394,7 +394,7 @@ app.get('/api/stats', async (req, res) => {
     const db = await readDb();
     res.json({ users: db.users.length, onlineReady: getStorageMode() !== 'missing', storage: getStorageMode() });
   } catch (error) {
-    res.status(500).json({ error: 'Server error. Try again.' });
+    res.status(500).json({ error: 'Database connection failed.', detail: error.message });
   }
 });
 
