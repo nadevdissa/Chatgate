@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChatGate</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <section class="screen landing-screen active" id="landingScreen">
+      <div class="landing-card">
+        <div class="landing-hero">
+          <div class="brand-icon logo-shake">💬</div>
+          <div>
+            <h1>Welcome to ChatGate</h1>
+            <p>Enter the gate and start chatting with anyone online.</p>
+          </div>
+        </div>
+        <button id="joinBtn" type="button" class="btn primary" onclick="openAuth()">Open the gate</button>
+      </div>
+    </section>
+
+    <section class="screen auth-screen" id="authScreen">
+      <div class="glass-card">
+        <div class="brand-panel">
+          <div class="brand-icon small">💬</div>
+          <div>
+            <h1>ChatGate</h1>
+            <p>Sign in with a username and password, then chat instantly.</p>
+          </div>
+        </div>
+
+        <form id="loginForm" novalidate>
+          <div class="field-group">
+            <label for="loginUsername">Username</label>
+            <input id="loginUsername" type="text" placeholder="Choose a username" autocomplete="username" required />
+          </div>
+
+          <div class="field-group">
+            <label for="loginPassword">Password</label>
+            <input id="loginPassword" type="password" placeholder="Create a password" autocomplete="new-password" required />
+          </div>
+
+          <button type="submit" class="btn primary">Enter Chat</button>
+        </form>
+
+        <div class="auth-footer">
+          <span class="hint">Accounts are saved on the server so anyone can join and chat.</span>
+          <span class="status-text" id="statusText">Ready to connect.</span>
+          <div id="loginReset" class="login-reset" style="display:none; margin-top:8px;">
+            <button id="resetPasswordBtn" class="btn secondary small">Reset password for this user</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen chat-screen" id="chatScreen">
+      <div class="chat-header">
+        <div>
+          <div class="brand-icon small">💬</div>
+          <h1>ChatGate</h1>
+          <p id="currentUserLabel">Logged in as <strong>...</strong></p>
+        </div>
+        <button class="btn secondary" id="logoutBtn">Log out</button>
+      </div>
+
+      <button id="drawerToggle" class="drawer-toggle" aria-label="Open sidebar">☰</button>
+      <div class="drawer-overlay" id="drawerOverlay"></div>
+
+      <div class="chat-layout">
+        <!-- Left Server Bar -->
+        <aside class="group-bar" id="groupBar">
+          <div class="server-stack">
+            <div class="server-pill">
+              <button class="server-icon dm-btn" id="homeBtn" type="button" aria-label="Direct Messages">
+                <svg class="dm-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="8" y="2" width="8" height="8" rx="2" />
+                  <rect x="2" y="8" width="8" height="8" rx="2" />
+                  <rect x="14" y="8" width="8" height="8" rx="2" />
+                  <rect x="8" y="14" width="8" height="8" rx="2" />
+                </svg>
+                <span class="server-tooltip">Direct Messages</span>
+              </button>
+            </div>
+            <div class="server-pill">
+              <button class="server-icon add-server-btn" id="addServerButton" type="button" aria-label="Add a Server">
+                <span class="add-server-plus">+</span>
+                <span class="server-tooltip">Add a Server</span>
+              </button>
+            </div>
+          </div>
+          <div class="group-list" id="groupIconList"></div>
+          <ul id="serverList" style="display:none;"></ul>
+
+          <!-- compact server-bottom removed; profile will live in the nav sidebar -->
+        </aside>
+
+        <!-- Navigation Sidebar -->
+        <aside class="chat-sidebar side-drawer" id="sideDrawer">
+          <div class="sidebar-card nav-panel">
+            <div class="search-row">
+              <input id="chatSearch" type="text" placeholder="Find or start a conversation" autocomplete="off" />
+            </div>
+
+            <ul class="menu-list" id="navMenu">
+              <li class="menu-item active" data-nav="friends"><span>💬</span>Friends</li>
+              <li class="menu-item" data-nav="requests"><span>✉️</span>Message Requests</li>
+            </ul>
+
+            <h4 class="dm-heading">Direct Messages <button class="btn secondary small" id="newChatBtn" type="button">+</button></h4>
+            <ul class="chat-list" id="friendList"></ul>
+          </div>
+          <!-- profile placeholder (hidden) kept for script compatibility -->
+          <div id="profileUsername" style="display:none"></div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="chat-panel">
+          <div class="main-top">
+            <div class="main-nav friends-nav" id="friendsNav">
+              <div class="nav-left">
+                <strong>Friends</strong>
+                <button class="tab small active" type="button">All</button>
+              </div>
+              <div class="nav-right">
+                <button id="addFriendBtn" class="btn primary small" type="button">Add Friend</button>
+              </div>
+            </div>
+            <div class="main-nav requests-nav" id="requestsNav" hidden>
+              <div class="nav-left">
+                <span class="nav-icon" aria-hidden="true">✉️</span>
+                <strong>Message Requests</strong>
+                <span class="nav-separator" aria-hidden="true">·</span>
+                <button class="tab small active" id="requestsTab" type="button">Requests</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="friends-panel" id="friendsPanel">
+            <div class="messages" id="messageList"></div>
+            <form id="messageForm" class="message-form">
+              <input id="messageInput" type="text" placeholder="Type a message..." autocomplete="off" />
+              <button type="submit" class="btn primary">Send</button>
+            </form>
+          </div>
+
+          <div class="requests-panel" id="requestsPanel" hidden>
+            <ul class="request-list" id="requestList"></ul>
+          </div>
+        </main>
+
+        <!-- Right Sidebar removed as requested -->
+      </div>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
