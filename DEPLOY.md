@@ -1,61 +1,66 @@
-# Deploy ChatGate Online
+# Deploy ChatGate
 
-ChatGate needs a Node.js server running 24/7. The easiest free option is **Render**.
+## Option A — Vercel (you already use this)
 
-## Step 1 — Put your code on GitHub
+Your site at Vercel shows the UI, but chat needs a **database** because Vercel cannot save files on the server.
 
-1. Go to [github.com/new](https://github.com/new)
-2. Create a repo named `chatgate` (leave it empty)
-3. In your project folder, run:
+### 1. Connect Supabase (recommended — you already did this)
 
-```bash
-cd "/Users/gayandissanayake/website project"
-git init
-git add .
-git commit -m "ChatGate multi-user chat app"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/chatgate.git
-git push -u origin main
-```
+1. Open [vercel.com/dashboard](https://vercel.com/dashboard) → your **my-website** project
+2. Go to **Storage** → your Supabase database → **Connect to Project**
+3. Make sure these env vars exist on the project:
+   - `POSTGRES_URL` (most important)
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
 
-Replace `YOUR_USERNAME` with your GitHub username.
+ChatGate uses `POSTGRES_URL` from Supabase to save users and messages.
 
-## Step 2 — Deploy on Render
+**Alternative:** Upstash Redis also works (`UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`).
 
-1. Go to [render.com](https://render.com) and sign up (free)
-2. Click **New +** → **Blueprint**
-3. Connect your GitHub account
-4. Select the `chatgate` repository
-5. Render will read `render.yaml` automatically
-6. Click **Apply** and wait 2–3 minutes
+### 2. Redeploy
 
-When it finishes, you get a URL like:
+Push your latest code to GitHub, or in Vercel click **Deployments** → **Redeploy**.
 
-`https://chatgate-xxxx.onrender.com`
+### 3. Turn off deployment protection (if you see a login wall)
 
-Share that link — anyone in the world can sign up and chat.
+Preview URLs like `my-website-5ib9pc6ps-....vercel.app` often require Vercel login.
 
-## Step 3 — Test it
+1. Project **Settings** → **Deployment Protection**
+2. Disable protection for **Production** (or share the main production URL instead)
 
-1. Open your Render URL
-2. Create an account
-3. Open the same URL on your phone or another computer
-4. Create a second account
-5. Send a friend request and start chatting
+Your public URL is usually:
 
-## Keep the server awake (free plan)
+`https://my-website.vercel.app`
 
-Render’s free plan sleeps after 15 minutes of no traffic. The first visit after sleep may take ~30 seconds to load. Upgrading to a paid plan ($7/mo) keeps it always on.
+(not the long preview link)
 
-## Data storage note
+### 4. Test
 
-User accounts and messages are saved on the server. On the free plan, data can reset if Render redeploys your app. For a school project or demo this is usually fine. For permanent storage, upgrade Render or add a database later.
+1. Open your production Vercel URL
+2. Create account `alice`
+3. On another phone/PC, open the same URL → create `bob`
+4. Send friend request → accept → chat
 
-## Run locally (for testing)
+Check the API works:
+
+`https://YOUR-URL.vercel.app/api/health`
+
+Should return: `{"ok":true,"service":"chatgate","storage":"supabase"}`
+
+---
+
+## Option B — Render (alternative)
+
+See `render.yaml` in this project. Good if you prefer a always-on Node server with file storage.
+
+---
+
+## Run locally
 
 ```bash
 npm install
 npm start
 ```
 
-Open http://localhost:3000
+Open http://localhost:3000 (uses `data/db.json` locally, no Redis needed).
