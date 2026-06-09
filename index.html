@@ -152,6 +152,20 @@
 
         <!-- Right Sidebar removed as requested -->
       </div>
+
+      <div class="add-friend-modal" id="addFriendModal" hidden>
+        <div class="add-friend-card">
+          <h3>Add Friend</h3>
+          <p class="hint">Enter their exact username (for example: <strong>Nadev</strong>)</p>
+          <input id="addFriendInput" type="text" placeholder="Username" autocomplete="off" />
+          <ul class="user-suggestions" id="userSuggestions"></ul>
+          <p class="add-friend-status" id="addFriendStatus"></p>
+          <div class="add-friend-actions">
+            <button type="button" class="btn secondary" id="cancelAddFriend">Cancel</button>
+            <button type="button" class="btn primary" id="confirmAddFriend">Send Request</button>
+          </div>
+        </div>
+      </div>
     </section>
   </div>
 

@@ -19,8 +19,18 @@ function makeToken() {
   return crypto.randomBytes(24).toString('hex');
 }
 
+function normalizeUsernameInput(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
 function findUserByUsername(db, username) {
-  return db.users.find((user) => user.username.toLowerCase() === username.toLowerCase());
+  const normalized = normalizeUsernameInput(username);
+  if (!normalized) return null;
+  return db.users.find((user) => user.username.toLowerCase() === normalized.toLowerCase()) || null;
+}
+
+function usersMatch(a, b) {
+  return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
 }
 
 async function getUserFromRequest(req) {
@@ -170,10 +180,29 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
 app.get('/api/users/exists', requireAuth, async (req, res) => {
   try {
-    const username = String(req.query.username || '').trim();
+    const username = normalizeUsernameInput(req.query.username);
     const db = await readDb();
     const user = findUserByUsername(db, username);
-    res.json({ exists: Boolean(user) });
+    res.json({ exists: Boolean(user), username: user ? user.username : null });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error. Try again.' });
+  }
+});
+
+app.get('/api/users/search', requireAuth, async (req, res) => {
+  try {
+    const query = normalizeUsernameInput(req.query.q);
+    const { user } = req.auth;
+    const db = await readDb();
+    if (!query || query.length < 2) {
+      return res.json({ users: [] });
+    }
+    const users = db.users
+      .filter((item) => !usersMatch(item.username, user.username))
+      .filter((item) => item.username.toLowerCase().includes(query.toLowerCase()))
+      .map((item) => item.username)
+      .slice(0, 8);
+    res.json({ users });
   } catch (error) {
     res.status(500).json({ error: 'Server error. Try again.' });
   }
@@ -213,32 +242,47 @@ app.get('/api/friends', requireAuth, (req, res) => {
   res.json({ friends });
 });
 
-app.get('/api/requests', requireAuth, (req, res) => {
-  const { db, user } = req.auth;
-  const requests = db.requests.filter(
-    (request) => request.to === user.username && request.status === 'pending'
-  );
-  res.json({ requests });
+app.get('/api/requests', requireAuth, async (req, res) => {
+  try {
+    const { user } = req.auth;
+    const db = await readDb();
+    const requests = db.requests.filter(
+      (request) => usersMatch(request.to, user.username) && request.status === 'pending'
+    );
+    res.json({ requests });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error. Try again.' });
+  }
 });
 
 app.post('/api/requests', requireAuth, async (req, res) => {
   try {
-    const to = String(req.body.to || '').trim();
-    const { db, user } = req.auth;
+    const rawTo = normalizeUsernameInput(req.body.to);
+    const { user } = req.auth;
+    const db = await readDb();
 
-    if (!to) {
+    if (!rawTo) {
       return res.status(400).json({ error: 'Username is required.' });
     }
-    if (to.toLowerCase() === user.username.toLowerCase()) {
+    if (usersMatch(rawTo, user.username)) {
       return res.status(400).json({ error: 'You cannot send a friend request to yourself.' });
     }
-    if (!findUserByUsername(db, to)) {
-      return res.status(404).json({ error: 'No user found with that username.' });
+
+    const targetUser = findUserByUsername(db, rawTo);
+    if (!targetUser) {
+      const suggestions = db.users
+        .filter((item) => !usersMatch(item.username, user.username))
+        .map((item) => item.username);
+      return res.status(404).json({
+        error: `No user found with username "${rawTo}". Check spelling and try again.`,
+        suggestions,
+      });
     }
 
+    const to = targetUser.username;
+
     const alreadyFriend = db.friends.some(
-      (friend) =>
-        friend.owner === user.username && friend.name.toLowerCase() === to.toLowerCase()
+      (friend) => usersMatch(friend.owner, user.username) && usersMatch(friend.name, to)
     );
     if (alreadyFriend) {
       return res.status(409).json({ error: 'That user is already in your friends list.' });
@@ -247,8 +291,8 @@ app.post('/api/requests', requireAuth, async (req, res) => {
     const duplicate = db.requests.some(
       (request) =>
         request.status === 'pending' &&
-        request.from.toLowerCase() === user.username.toLowerCase() &&
-        request.to.toLowerCase() === to.toLowerCase()
+        usersMatch(request.from, user.username) &&
+        usersMatch(request.to, to)
     );
     if (duplicate) {
       return res.status(409).json({ error: 'You already sent a friend request to this user.' });
@@ -257,8 +301,8 @@ app.post('/api/requests', requireAuth, async (req, res) => {
     const incoming = db.requests.find(
       (request) =>
         request.status === 'pending' &&
-        request.from.toLowerCase() === to.toLowerCase() &&
-        request.to.toLowerCase() === user.username.toLowerCase()
+        usersMatch(request.from, to) &&
+        usersMatch(request.to, user.username)
     );
     if (incoming) {
       return res.status(409).json({ error: 'That user already sent you a request.', code: 'incoming_exists' });
@@ -281,21 +325,20 @@ app.post('/api/requests', requireAuth, async (req, res) => {
 
 app.post('/api/requests/:id/accept', requireAuth, async (req, res) => {
   try {
-    const { db, user } = req.auth;
+    const { user } = req.auth;
+    const db = await readDb();
     const request = db.requests.find((item) => item.id === req.params.id);
-    if (!request || request.to !== user.username || request.status !== 'pending') {
+    if (!request || !usersMatch(request.to, user.username) || request.status !== 'pending') {
       return res.status(404).json({ error: 'Request not found.' });
     }
 
     const groupId =
       req.body.groupId ||
-      db.servers.find((server) => server.owner === user.username)?.id ||
+      db.servers.find((server) => usersMatch(server.owner, user.username))?.id ||
       null;
 
     const alreadyFriend = db.friends.some(
-      (friend) =>
-        friend.owner === user.username &&
-        friend.name.toLowerCase() === request.from.toLowerCase()
+      (friend) => usersMatch(friend.owner, user.username) && usersMatch(friend.name, request.from)
     );
 
     if (!alreadyFriend) {
@@ -309,14 +352,14 @@ app.post('/api/requests/:id/accept', requireAuth, async (req, res) => {
         id: makeId(),
         owner: request.from,
         name: user.username,
-        groupId: db.servers.find((server) => server.owner === request.from)?.id || null,
+        groupId: db.servers.find((server) => usersMatch(server.owner, request.from))?.id || null,
       });
     }
 
     request.status = 'accepted';
     await writeDb(db);
 
-    const friends = db.friends.filter((friend) => friend.owner === user.username);
+    const friends = db.friends.filter((friend) => usersMatch(friend.owner, user.username));
     res.json({ friends, request });
   } catch (error) {
     res.status(500).json({ error: 'Server error. Try again.' });
@@ -325,9 +368,10 @@ app.post('/api/requests/:id/accept', requireAuth, async (req, res) => {
 
 app.post('/api/requests/:id/decline', requireAuth, async (req, res) => {
   try {
-    const { db, user } = req.auth;
+    const { user } = req.auth;
+    const db = await readDb();
     const request = db.requests.find((item) => item.id === req.params.id);
-    if (!request || request.to !== user.username) {
+    if (!request || !usersMatch(request.to, user.username)) {
       return res.status(404).json({ error: 'Request not found.' });
     }
     request.status = 'declined';
@@ -338,45 +382,52 @@ app.post('/api/requests/:id/decline', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/messages', requireAuth, (req, res) => {
-  const friend = String(req.query.friend || '').trim();
-  const { db, user } = req.auth;
+app.get('/api/messages', requireAuth, async (req, res) => {
+  try {
+    const friend = normalizeUsernameInput(req.query.friend);
+    const { user } = req.auth;
+    const db = await readDb();
 
-  if (!friend) {
-    return res.status(400).json({ error: 'friend is required.' });
+    if (!friend) {
+      return res.status(400).json({ error: 'friend is required.' });
+    }
+
+    const messages = db.messages.filter((message) => {
+      return (
+        (usersMatch(message.sender, user.username) && usersMatch(message.recipient, friend)) ||
+        (usersMatch(message.sender, friend) && usersMatch(message.recipient, user.username))
+      );
+    });
+
+    res.json({ messages });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error. Try again.' });
   }
-
-  const messages = db.messages.filter((message) => {
-    return (
-      (message.sender === user.username && message.recipient === friend) ||
-      (message.sender === friend && message.recipient === user.username)
-    );
-  });
-
-  res.json({ messages });
 });
 
 app.post('/api/messages', requireAuth, async (req, res) => {
   try {
     const content = String(req.body.content || '').trim();
     const groupId = String(req.body.groupId || '') || null;
-    const recipient = String(req.body.recipient || '').trim();
-    const { db, user } = req.auth;
+    const rawRecipient = normalizeUsernameInput(req.body.recipient);
+    const { user } = req.auth;
+    const db = await readDb();
 
     if (!content) {
       return res.status(400).json({ error: 'Message cannot be empty.' });
     }
-    if (!recipient) {
+    if (!rawRecipient) {
       return res.status(400).json({ error: 'Select a friend before sending a message.' });
     }
-    if (!findUserByUsername(db, recipient)) {
+    const recipientUser = findUserByUsername(db, rawRecipient);
+    if (!recipientUser) {
       return res.status(404).json({ error: 'Recipient not found.' });
     }
 
     const message = {
       id: makeId(),
       sender: user.username,
-      recipient,
+      recipient: recipientUser.username,
       content,
       groupId,
       sent_at: new Date().toISOString(),

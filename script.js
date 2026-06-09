@@ -33,6 +33,12 @@ const requestsNav = document.getElementById('requestsNav');
 const friendsPanel = document.getElementById('friendsPanel');
 const requestsPanel = document.getElementById('requestsPanel');
 const requestList = document.getElementById('requestList');
+const addFriendModal = document.getElementById('addFriendModal');
+const addFriendInput = document.getElementById('addFriendInput');
+const userSuggestions = document.getElementById('userSuggestions');
+const addFriendStatus = document.getElementById('addFriendStatus');
+const cancelAddFriend = document.getElementById('cancelAddFriend');
+const confirmAddFriend = document.getElementById('confirmAddFriend');
 
 const STORAGE_TOKEN = 'chatGateToken';
 const API_BASE = '/api';
@@ -108,9 +114,59 @@ async function apiFetch(path, options = {}) {
     const error = new Error(data.error || 'Something went wrong.');
     error.code = data.code;
     error.status = response.status;
+    error.suggestions = data.suggestions || [];
     throw error;
   }
   return data;
+}
+
+function setAddFriendStatus(message, type = '') {
+  if (!addFriendStatus) return;
+  addFriendStatus.textContent = message;
+  addFriendStatus.className = `add-friend-status${type ? ` ${type}` : ''}`;
+}
+
+function openAddFriendModal() {
+  if (!addFriendModal) return;
+  addFriendModal.hidden = false;
+  setAddFriendStatus('');
+  if (userSuggestions) userSuggestions.innerHTML = '';
+  if (addFriendInput) {
+    addFriendInput.value = '';
+    addFriendInput.focus();
+  }
+}
+
+function closeAddFriendModal() {
+  if (!addFriendModal) return;
+  addFriendModal.hidden = true;
+}
+
+async function refreshUserSuggestions(query) {
+  if (!userSuggestions) return;
+  const q = query.trim();
+  if (q.length < 2) {
+    userSuggestions.innerHTML = '';
+    return;
+  }
+  try {
+    const data = await apiFetch(`/users/search?q=${encodeURIComponent(q)}`);
+    userSuggestions.innerHTML = '';
+    data.users.forEach((username) => {
+      const li = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = username;
+      button.addEventListener('click', () => {
+        if (addFriendInput) addFriendInput.value = username;
+        userSuggestions.innerHTML = '';
+      });
+      li.appendChild(button);
+      userSuggestions.appendChild(li);
+    });
+  } catch (error) {
+    userSuggestions.innerHTML = '';
+  }
 }
 
 function updateProfilePanel() {
@@ -171,20 +227,30 @@ async function refreshRequests() {
 }
 
 async function sendFriendRequest(username) {
-  if (!currentUser) return;
-  const target = username.trim();
-  if (!target) return;
+  if (!currentUser) return false;
+  const target = username.trim().replace(/\s+/g, ' ');
+  if (!target) {
+    setAddFriendStatus('Enter a username first.', 'error');
+    return false;
+  }
   try {
-    await apiFetch('/requests', { method: 'POST', body: { to: target } });
-    alert(`Friend request sent to ${target}.`);
+    const data = await apiFetch('/requests', { method: 'POST', body: { to: target } });
+    setAddFriendStatus(`Friend request sent to ${data.request.to}.`, 'success');
+    setTimeout(closeAddFriendModal, 1200);
+    return true;
   } catch (error) {
     if (error.code === 'incoming_exists') {
-      alert(`${target} already sent you a request. Check Message Requests.`);
+      setAddFriendStatus(`${target} already sent you a request. Open Message Requests.`, 'error');
       switchNavView('requests');
       await refreshRequests();
-      return;
+      return false;
     }
-    alert(error.message);
+    let message = error.message;
+    if (error.suggestions?.length) {
+      message += ` Available users: ${error.suggestions.join(', ')}`;
+    }
+    setAddFriendStatus(message, 'error');
+    return false;
   }
 }
 
@@ -515,10 +581,35 @@ function initApp() {
   });
 
   if (addFriendBtn) {
-    addFriendBtn.addEventListener('click', async () => {
-      const username = prompt('Enter a username to send a friend request to');
-      if (!username) return;
-      await sendFriendRequest(username);
+    addFriendBtn.addEventListener('click', openAddFriendModal);
+  }
+
+  if (cancelAddFriend) {
+    cancelAddFriend.addEventListener('click', closeAddFriendModal);
+  }
+
+  if (confirmAddFriend) {
+    confirmAddFriend.addEventListener('click', async () => {
+      if (!addFriendInput) return;
+      await sendFriendRequest(addFriendInput.value);
+    });
+  }
+
+  if (addFriendInput) {
+    addFriendInput.addEventListener('input', () => {
+      refreshUserSuggestions(addFriendInput.value);
+    });
+    addFriendInput.addEventListener('keydown', async (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        await sendFriendRequest(addFriendInput.value);
+      }
+    });
+  }
+
+  if (addFriendModal) {
+    addFriendModal.addEventListener('click', (event) => {
+      if (event.target === addFriendModal) closeAddFriendModal();
     });
   }
 
