@@ -39,6 +39,12 @@ const userSuggestions = document.getElementById('userSuggestions');
 const addFriendStatus = document.getElementById('addFriendStatus');
 const cancelAddFriend = document.getElementById('cancelAddFriend');
 const confirmAddFriend = document.getElementById('confirmAddFriend');
+const requestBadge = document.getElementById('requestBadge');
+const sidebarUsername = document.getElementById('sidebarUsername');
+const sidebarAvatar = document.getElementById('sidebarAvatar');
+const activeChatTitle = document.getElementById('activeChatTitle');
+const chatStatus = document.getElementById('chatStatus');
+const homeBtn = document.getElementById('homeBtn');
 
 const STORAGE_TOKEN = 'chatGateToken';
 const API_BASE = '/api';
@@ -169,13 +175,53 @@ async function refreshUserSuggestions(query) {
   }
 }
 
+function showChatStatus(message, isError = false) {
+  if (!chatStatus) return;
+  chatStatus.textContent = message;
+  chatStatus.className = `chat-status${isError ? ' error' : message ? ' success' : ''}`;
+}
+
 function updateProfilePanel() {
   if (!currentUser) return;
   currentUserLabel.innerHTML = `Logged in as <strong>${currentUser.username}</strong>`;
   profileUsername.textContent = currentUser.username;
+  if (sidebarUsername) sidebarUsername.textContent = currentUser.username;
+  if (sidebarAvatar) sidebarAvatar.textContent = currentUser.username.slice(0, 2).toUpperCase();
 }
 
-function switchNavView(view) {
+function updateActiveChatHeader() {
+  if (!activeChatTitle) return;
+  if (activeChatFriend) {
+    activeChatTitle.textContent = activeChatFriend.name;
+  } else {
+    activeChatTitle.textContent = 'Friends';
+  }
+}
+
+function updateRequestBadge() {
+  if (!requestBadge) return;
+  const count = cachedRequests.length;
+  if (count > 0) {
+    requestBadge.hidden = false;
+    requestBadge.textContent = String(count);
+  } else {
+    requestBadge.hidden = true;
+  }
+}
+
+function selectFriend(friend) {
+  activeChatFriend = friend;
+  document.querySelectorAll('.chat-list li').forEach((el) => {
+    el.classList.toggle('active', el.dataset.id === String(friend.id));
+  });
+  switchNavView('friends');
+  updateActiveChatHeader();
+  closeDrawer();
+  showChatStatus('');
+  renderMessagesForActiveChat();
+}
+
+async function switchNavView(view) {
   activeNavView = view;
   if (navMenu) {
     navMenu.querySelectorAll('.menu-item').forEach((item) => {
@@ -187,8 +233,11 @@ function switchNavView(view) {
   if (friendsPanel) friendsPanel.hidden = view !== 'friends';
   if (requestsPanel) requestsPanel.hidden = view !== 'requests';
   if (view === 'requests') {
+    await refreshRequests();
     renderFriendRequests();
+    closeDrawer();
   } else {
+    updateActiveChatHeader();
     renderMessagesForActiveChat();
   }
 }
@@ -223,6 +272,7 @@ function renderFriendRequests() {
 async function refreshRequests() {
   const data = await apiFetch('/requests');
   cachedRequests = data.requests;
+  updateRequestBadge();
   if (activeNavView === 'requests') renderFriendRequests();
 }
 
@@ -263,9 +313,11 @@ async function acceptFriendRequest(requestId) {
     cachedFriends = data.friends;
     await refreshRequests();
     renderFriends(cachedFriends);
-    switchNavView('friends');
+    const acceptedFriend = cachedFriends.find((friend) => friend.name === data.request.from);
+    if (acceptedFriend) selectFriend(acceptedFriend);
+    else switchNavView('friends');
   } catch (error) {
-    alert(error.message);
+    showChatStatus(error.message, true);
   }
 }
 
@@ -273,8 +325,9 @@ async function declineFriendRequest(requestId) {
   try {
     await apiFetch(`/requests/${requestId}/decline`, { method: 'POST' });
     await refreshRequests();
+    renderFriendRequests();
   } catch (error) {
-    alert(error.message);
+    showChatStatus(error.message, true);
   }
 }
 
@@ -295,11 +348,10 @@ function renderFriends(friends) {
       </div>
     `;
     li.dataset.id = friend.id;
-    li.addEventListener('click', () => {
-      document.querySelectorAll('.chat-list li').forEach((el) => el.classList.toggle('active', el === li));
-      activeChatFriend = friend;
-      renderMessagesForActiveChat();
-    });
+    if (activeChatFriend && activeChatFriend.id === friend.id) {
+      li.classList.add('active');
+    }
+    li.addEventListener('click', () => selectFriend(friend));
     friendList.appendChild(li);
   });
 }
@@ -348,10 +400,8 @@ function autoSelectDefault() {
     selectGroup(cachedServers[0].id);
     return;
   }
-  if (cachedFriends.length) {
-    const first = cachedFriends[0];
-    const li = document.querySelector(`.chat-list li[data-id="${first.id}"]`);
-    if (li) li.click();
+  if (cachedFriends.length && !activeChatFriend) {
+    selectFriend(cachedFriends[0]);
   }
 }
 
@@ -371,7 +421,7 @@ function paintMessages(messages) {
   }
   messages.forEach((message) => {
     const row = document.createElement('div');
-    row.className = `message-row ${message.sender === currentUser.username ? 'self' : ''}`;
+    row.className = `message-row ${message.sender?.toLowerCase() === currentUser.username?.toLowerCase() ? 'self' : ''}`;
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble';
     bubble.textContent = message.content;
@@ -418,6 +468,11 @@ function startPolling() {
       await refreshRequests();
       if (activeNavView === 'friends' && activeChatFriend) {
         await renderMessagesForActiveChat();
+      }
+      const friendsData = await apiFetch('/friends');
+      if (friendsData.friends.length !== cachedFriends.length) {
+        cachedFriends = friendsData.friends;
+        renderFriends(cachedFriends);
       }
     } catch (error) {
       // Ignore polling errors silently.
@@ -537,18 +592,19 @@ function initApp() {
     const text = messageInput.value.trim();
     if (!text) return;
     if (!currentUser) {
-      showStatus('Please sign in to send messages.', true);
+      showChatStatus('Please sign in to send messages.', true);
       return;
     }
     if (!activeChatFriend) {
-      showStatus('Select a friend before sending a message.', true);
+      showChatStatus('Select a friend from Direct Messages first.', true);
       return;
     }
     try {
       await addMessage(text);
       messageInput.value = '';
+      showChatStatus('');
     } catch (error) {
-      showStatus(error.message, true);
+      showChatStatus(error.message, true);
     }
   });
 
@@ -620,6 +676,14 @@ function initApp() {
         if (view) switchNavView(view);
       });
     });
+  }
+
+  if (homeBtn) {
+    homeBtn.addEventListener('click', () => switchNavView('friends'));
+  }
+
+  if (document.getElementById('newChatBtn')) {
+    document.getElementById('newChatBtn').addEventListener('click', openAddFriendModal);
   }
 
   tabButtons.forEach((button) => {

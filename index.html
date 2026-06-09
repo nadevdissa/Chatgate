@@ -57,10 +57,12 @@
 
     <section class="screen chat-screen" id="chatScreen">
       <div class="chat-header">
-        <div>
+        <div class="chat-header-main">
           <div class="brand-icon small">💬</div>
-          <h1>ChatGate</h1>
-          <p id="currentUserLabel">Logged in as <strong>...</strong></p>
+          <div>
+            <h1>ChatGate</h1>
+            <p id="currentUserLabel">Logged in as <strong>...</strong></p>
+          </div>
         </div>
         <button class="btn secondary" id="logoutBtn">Log out</button>
       </div>
@@ -105,11 +107,22 @@
 
             <ul class="menu-list" id="navMenu">
               <li class="menu-item active" data-nav="friends"><span>💬</span>Friends</li>
-              <li class="menu-item" data-nav="requests"><span>✉️</span>Message Requests</li>
+              <li class="menu-item" data-nav="requests">
+                <span>✉️</span>Message Requests
+                <span class="request-badge" id="requestBadge" hidden>0</span>
+              </li>
             </ul>
 
             <h4 class="dm-heading">Direct Messages <button class="btn secondary small" id="newChatBtn" type="button">+</button></h4>
             <ul class="chat-list" id="friendList"></ul>
+
+            <div class="sidebar-profile">
+              <div class="sidebar-profile-avatar" id="sidebarAvatar">--</div>
+              <div class="sidebar-profile-info">
+                <strong id="sidebarUsername">You</strong>
+                <span>Logged in</span>
+              </div>
+            </div>
           </div>
           <!-- profile placeholder (hidden) kept for script compatibility -->
           <div id="profileUsername" style="display:none"></div>
@@ -120,7 +133,7 @@
           <div class="main-top">
             <div class="main-nav friends-nav" id="friendsNav">
               <div class="nav-left">
-                <strong>Friends</strong>
+                <strong id="activeChatTitle">Friends</strong>
                 <button class="tab small active" type="button">All</button>
               </div>
               <div class="nav-right">
@@ -138,6 +151,7 @@
           </div>
 
           <div class="friends-panel" id="friendsPanel">
+            <p class="chat-status" id="chatStatus" aria-live="polite"></p>
             <div class="messages" id="messageList"></div>
             <form id="messageForm" class="message-form">
               <input id="messageInput" type="text" placeholder="Type a message..." autocomplete="off" />
