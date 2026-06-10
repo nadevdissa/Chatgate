@@ -1,6 +1,9 @@
 .vercel
 node_modules
+dist
 data/db.json
 .DS_Store
 .env.vercel.local
 .env*.local
+.env.prod.test
+ringtone.wav

@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ChatGate</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="favicon.svg" />
+  <meta name="theme-color" content="#5e91ff" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -14,7 +17,7 @@
           <div class="brand-icon logo-shake">💬</div>
           <div>
             <h1>Welcome to ChatGate</h1>
-            <p>Enter the gate and start chatting with anyone online.</p>
+            <p class="landing-tagline">Enter the gate. Vibe with friends. Summon GateBot. 🚀</p>
           </div>
         </div>
         <button id="joinBtn" type="button" class="btn primary" onclick="openAuth()">Open the gate</button>
@@ -48,9 +51,43 @@
         <div class="auth-footer">
           <span class="hint">Accounts are saved on the server so anyone can join and chat.</span>
           <span class="status-text" id="statusText">Ready to connect.</span>
-          <div id="loginReset" class="login-reset" style="display:none; margin-top:8px;">
-            <button id="resetPasswordBtn" class="btn secondary small">Reset password for this user</button>
+          <div id="loginReset" class="login-reset" hidden>
+            <p class="reset-title">Forgot your password?</p>
+            <p class="reset-hint">Enter your passkey and choose a new password.</p>
+            <div class="field-group">
+              <label for="resetPasskey">Passkey</label>
+              <input id="resetPasskey" type="text" placeholder="e.g. CG-A1B2-C3D4" autocomplete="off" spellcheck="false" />
+            </div>
+            <div class="field-group">
+              <label for="resetNewPassword">New password</label>
+              <input id="resetNewPassword" type="password" placeholder="New password" autocomplete="new-password" />
+            </div>
+            <div class="field-group">
+              <label for="resetConfirmPassword">Confirm password</label>
+              <input id="resetConfirmPassword" type="password" placeholder="Confirm new password" autocomplete="new-password" />
+            </div>
+            <label class="save-passkey-option">
+              <input type="checkbox" id="savePasskeyCheckbox" checked />
+              Save passkey on this device
+            </label>
+            <div class="reset-actions">
+              <button type="button" id="resetPasswordBtn" class="btn primary">Reset password</button>
+              <button type="button" id="cancelResetBtn" class="btn secondary">Cancel</button>
+            </div>
           </div>
+        </div>
+      </div>
+
+      <div class="passkey-modal" id="passkeyModal" hidden>
+        <div class="passkey-card">
+          <h3>Save your passkey</h3>
+          <p class="hint">Keep this passkey safe. You need it to reset your password if you forget it.</p>
+          <div class="passkey-display" id="passkeyDisplay"></div>
+          <label class="save-passkey-option">
+            <input type="checkbox" id="passkeyModalSave" checked />
+            Save passkey on this device
+          </label>
+          <button type="button" class="btn primary" id="passkeyModalDone">Got it</button>
         </div>
       </div>
     </section>
@@ -75,20 +112,9 @@
         <aside class="group-bar" id="groupBar">
           <div class="server-stack">
             <div class="server-pill">
-              <button class="server-icon dm-btn" id="homeBtn" type="button" aria-label="Direct Messages">
-                <svg class="dm-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <rect x="8" y="2" width="8" height="8" rx="2" />
-                  <rect x="2" y="8" width="8" height="8" rx="2" />
-                  <rect x="14" y="8" width="8" height="8" rx="2" />
-                  <rect x="8" y="14" width="8" height="8" rx="2" />
-                </svg>
-                <span class="server-tooltip">Direct Messages</span>
-              </button>
-            </div>
-            <div class="server-pill">
-              <button class="server-icon add-server-btn" id="addServerButton" type="button" aria-label="Add a Server">
+              <button class="server-icon add-server-btn" id="addServerButton" type="button" aria-label="Create a group">
                 <span class="add-server-plus">+</span>
-                <span class="server-tooltip">Add a Server</span>
+                <span class="server-tooltip">Create group</span>
               </button>
             </div>
           </div>
@@ -102,7 +128,7 @@
         <aside class="chat-sidebar side-drawer" id="sideDrawer">
           <div class="sidebar-card nav-panel">
             <div class="search-row">
-              <input id="chatSearch" type="text" placeholder="Find or start a conversation" autocomplete="off" />
+              <input id="chatSearch" type="text" placeholder="Search friends or messages" autocomplete="off" />
             </div>
 
             <ul class="menu-list" id="navMenu">
@@ -111,18 +137,37 @@
                 <span>✉️</span>Message Requests
                 <span class="request-badge" id="requestBadge" hidden>0</span>
               </li>
+              <li class="menu-item" data-nav="blocked"><span>🚫</span>Blocked</li>
             </ul>
 
-            <h4 class="dm-heading">Direct Messages <button class="btn secondary small" id="newChatBtn" type="button">+</button></h4>
+            <h4 class="dm-heading" id="dmHeading">Direct Messages <button class="btn secondary small" id="newChatBtn" type="button">+</button></h4>
+            <ul class="chat-list gatebot-sidebar-list" id="gatebotSidebarList">
+              <li class="chat-list-item gatebot-sidebar-item" id="gatebotSidebarItem">
+                <button class="chat-row-main" type="button" id="openGateBotChatBtn">
+                  <div class="chat-avatar gatebot-avatar">🤖</div>
+                  <div class="chat-item-details">
+                    <strong>GateBot</strong>
+                    <span>Your private AI chat · /help</span>
+                  </div>
+                </button>
+              </li>
+            </ul>
             <ul class="chat-list" id="friendList"></ul>
+            <div id="groupMemberSection" hidden>
+              <h4 class="dm-heading">Group members <button class="btn secondary small" id="addGroupMemberBtn" type="button">+</button></h4>
+              <ul class="chat-list" id="groupMemberList"></ul>
+            </div>
 
-            <div class="sidebar-profile">
-              <div class="sidebar-profile-avatar" id="sidebarAvatar">--</div>
+            <button type="button" class="sidebar-profile" id="openProfileBtn" aria-label="Edit your profile">
+              <div class="sidebar-profile-avatar-wrap">
+                <div class="sidebar-profile-avatar" id="sidebarAvatar">--</div>
+                <span class="sidebar-self-presence online" id="sidebarSelfPresence" aria-hidden="true"></span>
+              </div>
               <div class="sidebar-profile-info">
                 <strong id="sidebarUsername">You</strong>
-                <span>Logged in</span>
+                <span id="sidebarProfileHint">Edit profile</span>
               </div>
-            </div>
+            </button>
           </div>
           <!-- profile placeholder (hidden) kept for script compatibility -->
           <div id="profileUsername" style="display:none"></div>
@@ -137,6 +182,14 @@
                 <button class="tab small active" type="button">All</button>
               </div>
               <div class="nav-right">
+                <button id="callFriendBtn" class="btn secondary small call-friend-btn" type="button" hidden aria-label="Start voice call">📞 Call</button>
+                <div class="chat-actions" id="chatActions" hidden>
+                  <button id="removeFriendBtn" class="btn secondary small" type="button">Unfriend</button>
+                  <button id="blockFriendBtn" class="btn secondary small danger" type="button">Block</button>
+                </div>
+                <button id="themeGroupBtn" class="btn secondary small cool-btn" type="button" hidden title="Group theme">🎨</button>
+                <button id="vibeToggleBtn" class="btn secondary small cool-btn" type="button" hidden title="Vibe mode">✨</button>
+                <button id="deleteServerBtn" class="btn secondary small danger" type="button" hidden>Delete group</button>
                 <button id="addFriendBtn" class="btn primary small" type="button">Add Friend</button>
               </div>
             </div>
@@ -148,23 +201,237 @@
                 <button class="tab small active" id="requestsTab" type="button">Requests</button>
               </div>
             </div>
+            <div class="main-nav blocked-nav" id="blockedNav" hidden>
+              <div class="nav-left">
+                <span class="nav-icon" aria-hidden="true">🚫</span>
+                <strong>Blocked Users</strong>
+              </div>
+            </div>
           </div>
 
           <div class="friends-panel" id="friendsPanel">
+            <canvas id="vibeCanvas" class="vibe-canvas" aria-hidden="true"></canvas>
+            <div class="channel-bar" id="channelBar" hidden>
+              <div class="channel-list" id="channelList"></div>
+              <button type="button" class="btn secondary small channel-add-btn" id="addChannelBtn" hidden>+ Channel</button>
+            </div>
+            <div class="chat-action-bar" id="chatActionBar" hidden>
+              <button id="actionUnfriendBtn" class="action-btn unfriend" type="button">Unfriend</button>
+              <button id="actionBlockBtn" class="action-btn block" type="button">Block</button>
+            </div>
+            <div class="call-panel" id="callScreen" hidden>
+              <audio id="callRemoteAudio" autoplay playsinline></audio>
+              <video id="callRemoteVideo" class="call-video" playsinline autoplay hidden></video>
+              <video id="callLocalVideo" class="call-video local" playsinline autoplay muted hidden></video>
+              <div class="call-panel-inner">
+                <div class="call-panel-main">
+                  <div class="call-avatar compact" id="callRemoteAvatar">--</div>
+                  <div class="call-panel-text">
+                    <strong id="callRemoteName">Friend</strong>
+                    <span class="call-status-text" id="callStatusText">Calling...</span>
+                  </div>
+                  <div class="call-avatar compact self" id="callLocalAvatar" title="You">YO</div>
+                </div>
+                <div class="call-toolbar compact">
+                  <div class="call-toolbar-group">
+                    <button type="button" class="call-control small" id="toggleMicBtn" aria-label="Mute microphone">🎤</button>
+                    <button type="button" class="call-control small" id="toggleCameraBtn" aria-label="Turn camera on">📷</button>
+                  </div>
+                  <button type="button" class="call-end-btn small" id="endCallBtn" aria-label="End call">📞</button>
+                </div>
+              </div>
+            </div>
             <p class="chat-status" id="chatStatus" aria-live="polite"></p>
+            <p class="typing-indicator" id="typingIndicator" hidden aria-live="polite"></p>
             <div class="messages" id="messageList"></div>
-            <form id="messageForm" class="message-form">
-              <input id="messageInput" type="text" placeholder="Type a message..." autocomplete="off" />
-              <button type="submit" class="btn primary">Send</button>
-            </form>
+            <div class="message-context-menu" id="messageContextMenu" hidden>
+              <div class="context-menu-section" id="contextReactionSection">
+                <span class="context-menu-label">React</span>
+                <div class="context-reaction-row" id="contextReactionRow"></div>
+              </div>
+              <div class="context-menu-section" id="contextActionSection">
+                <button type="button" id="contextEditMessageBtn">Edit message</button>
+                <button type="button" id="contextDeleteMessageBtn">Delete message</button>
+              </div>
+            </div>
+            <div class="composer-wrap" id="composerWrap">
+              <div class="drop-overlay" id="dropOverlay" hidden>Drop image or video to send</div>
+              <div class="picker-panel emoji-picker" id="emojiPicker" hidden>
+                <div class="picker-grid" id="emojiGrid"></div>
+              </div>
+              <div class="picker-panel sticker-picker" id="stickerPicker" hidden>
+                <p class="picker-title">Stickers</p>
+                <div class="picker-grid sticker-grid" id="stickerGrid"></div>
+              </div>
+              <form id="messageForm" class="message-form">
+                <div class="composer-tools">
+                  <button type="button" class="composer-btn" id="emojiBtn" aria-label="Add emoji">😀</button>
+                  <button type="button" class="composer-btn" id="stickerBtn" aria-label="Send sticker">✨</button>
+                  <button type="button" class="composer-btn" id="voiceBtn" aria-label="Record voice message">🎤</button>
+                  <button type="button" class="composer-btn" id="mediaBtn" aria-label="Camera and media">📷</button>
+                  <input id="cameraPhotoInput" type="file" accept="image/*" capture="environment" hidden />
+                  <input id="galleryImageInput" type="file" accept="image/*" hidden />
+                  <input id="galleryVideoInput" type="file" accept="video/*" hidden />
+                </div>
+                <input id="messageInput" type="text" placeholder="Message..." autocomplete="off" />
+                <button type="submit" class="btn primary" id="sendMessageBtn">Send</button>
+              </form>
+              <div class="media-sheet" id="mediaSheet" hidden>
+                <button type="button" class="media-sheet-item" data-media="camera-photo">📸 Take Photo</button>
+                <button type="button" class="media-sheet-item" data-media="gallery-photo">🖼️ Choose Photo</button>
+                <button type="button" class="media-sheet-item" data-media="record-video">🎥 Record Video</button>
+                <button type="button" class="media-sheet-item" data-media="gallery-video">📁 Choose Video</button>
+              </div>
+            </div>
+            <div class="record-modal" id="recordModal" hidden>
+              <div class="record-card">
+                <video id="recordPreview" class="record-preview" playsinline muted autoplay></video>
+                <video id="recordPlayback" class="record-preview" playsinline controls hidden></video>
+                <p class="record-timer" id="recordTimer">Tap Record — max 20 sec</p>
+                <div class="record-actions">
+                  <button type="button" class="btn secondary" id="cancelRecordBtn">Cancel</button>
+                  <button type="button" class="btn primary" id="startRecordBtn">Record</button>
+                  <button type="button" class="btn secondary" id="stopRecordBtn" hidden>Stop</button>
+                  <button type="button" class="btn primary" id="sendRecordBtn" hidden>Send Video</button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="requests-panel" id="requestsPanel" hidden>
             <ul class="request-list" id="requestList"></ul>
           </div>
+
+          <div class="blocked-panel" id="blockedPanel" hidden>
+            <ul class="blocked-list" id="blockedList"></ul>
+          </div>
         </main>
 
         <!-- Right Sidebar removed as requested -->
+      </div>
+
+      <div class="profile-modal" id="profileModal" hidden>
+        <div class="profile-card-modal">
+          <h3>Your profile</h3>
+          <div class="profile-edit-avatar-wrap">
+            <div class="profile-edit-avatar" id="profileEditAvatar">--</div>
+            <label class="btn secondary small profile-photo-btn">
+              Change photo
+              <input id="profilePhotoInput" type="file" accept="image/*" hidden />
+            </label>
+            <button type="button" class="btn secondary small" id="removeProfilePhotoBtn">Remove</button>
+          </div>
+          <div class="field-group">
+            <label for="profileDisplayName">Display name</label>
+            <input id="profileDisplayName" type="text" maxlength="32" placeholder="Your name" />
+          </div>
+          <div class="field-group">
+            <label for="profileBio">Bio</label>
+            <textarea id="profileBio" rows="3" maxlength="200" placeholder="Tell friends a little about you..."></textarea>
+          </div>
+          <div class="profile-dnd-row">
+            <div class="profile-dnd-copy">
+              <strong>Do Not Disturb</strong>
+              <span>Mute notifications & show red status</span>
+            </div>
+            <button type="button" class="profile-dnd-btn" id="profileDndBtn" aria-pressed="false" title="Do Not Disturb">🔕</button>
+          </div>
+          <p class="profile-edit-status" id="profileEditStatus"></p>
+          <div class="profile-edit-actions">
+            <button type="button" class="btn secondary" id="cancelProfileBtn">Cancel</button>
+            <button type="button" class="btn primary" id="saveProfileBtn">Save profile</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="theme-modal" id="themeModal" hidden>
+        <div class="theme-card">
+          <h3>Group vibe & theme</h3>
+          <p class="hint">Pick a look for this group. Everyone in the group sees it.</p>
+          <div class="theme-grid" id="themeGrid"></div>
+          <div class="theme-modal-actions">
+            <button type="button" class="btn secondary" id="closeThemeModalBtn">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="edit-message-modal" id="editMessageModal" hidden>
+        <div class="edit-message-card">
+          <h3>Edit message</h3>
+          <textarea id="editMessageInput" rows="4" maxlength="2000" placeholder="Update your message"></textarea>
+          <p class="edit-message-status" id="editMessageStatus"></p>
+          <div class="edit-message-actions">
+            <button type="button" class="btn secondary" id="cancelEditMessageBtn">Cancel</button>
+            <button type="button" class="btn primary" id="saveEditMessageBtn">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mic-permission-modal" id="micPermissionModal" hidden>
+        <div class="mic-permission-card">
+          <div class="mic-permission-icon" aria-hidden="true">🎤</div>
+          <h3>Allow microphone</h3>
+          <p>ChatGate needs your microphone to record and send voice messages. Tap allow when your browser asks.</p>
+          <p class="mic-permission-status" id="micPermissionStatus"></p>
+          <div class="mic-permission-actions">
+            <button type="button" class="btn secondary" id="cancelMicPermissionBtn">Not now</button>
+            <button type="button" class="btn primary" id="allowMicPermissionBtn">Allow microphone</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="voice-note-modal" id="voiceNoteModal" hidden>
+        <div class="voice-note-card">
+          <h3>Voice message</h3>
+          <p class="voice-note-timer" id="voiceNoteTimer">Tap Record — max 60 sec</p>
+          <audio id="voiceNotePlayback" controls hidden></audio>
+          <div class="voice-note-actions">
+            <button type="button" class="btn secondary" id="cancelVoiceBtn">Cancel</button>
+            <button type="button" class="btn primary" id="startVoiceBtn">Record</button>
+            <button type="button" class="btn secondary" id="stopVoiceBtn" hidden>Stop</button>
+            <button type="button" class="btn primary" id="sendVoiceBtn" hidden>Send</button>
+          </div>
+        </div>
+      </div>
+
+      <audio id="ringtonePlayer" src="ringtone.wav" loop preload="none"></audio>
+
+      <div class="incoming-call-modal" id="incomingCallModal" hidden>
+        <div class="incoming-call-card">
+          <div class="incoming-call-avatar ringing" id="incomingCallerAvatar">--</div>
+          <h3>Incoming call</h3>
+          <p><strong id="incomingCallerName">Friend</strong> is calling you on ChatGate</p>
+          <div class="incoming-call-actions">
+            <button type="button" class="btn primary" id="acceptCallBtn">Accept</button>
+            <button type="button" class="btn secondary danger" id="declineCallBtn">Decline</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="add-friend-modal" id="createGroupModal" hidden>
+        <div class="add-friend-card">
+          <h3>Create Group</h3>
+          <p class="hint">Choose a name for your group (for example: <strong>Nadev Squad</strong>)</p>
+          <input id="createGroupInput" type="text" placeholder="Group name" autocomplete="off" maxlength="48" />
+          <p class="add-friend-status" id="createGroupStatus"></p>
+          <div class="add-friend-actions">
+            <button type="button" class="btn secondary" id="cancelCreateGroup">Cancel</button>
+            <button type="button" class="btn primary" id="confirmCreateGroup">Create Group</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="add-friend-modal" id="addGroupMemberModal" hidden>
+        <div class="add-friend-card">
+          <h3>Add friend to group</h3>
+          <p class="hint">Pick a friend to add to this group chat.</p>
+          <select id="addGroupMemberSelect" class="group-member-select"></select>
+          <p class="add-friend-status" id="addGroupMemberStatus"></p>
+          <div class="add-friend-actions">
+            <button type="button" class="btn secondary" id="cancelAddGroupMember">Cancel</button>
+            <button type="button" class="btn primary" id="confirmAddGroupMember">Add to group</button>
+          </div>
+        </div>
       </div>
 
       <div class="add-friend-modal" id="addFriendModal" hidden>
@@ -183,6 +450,9 @@
     </section>
   </div>
 
-  <script src="script.js"></script>
+  <audio id="messageSendPlayer" src="discord-notification.mp3" preload="auto"></audio>
+
+  <script src="calls.js" defer></script>
+  <script src="script.js" defer></script>
 </body>
 </html>
